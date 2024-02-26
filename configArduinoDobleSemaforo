@@ -1,0 +1,209 @@
+// C++ code
+//
+
+/** CONFIG SEMAFORO **/
+const int DUR = 3000; //Duracion normal
+const int semaforoPins[] = {
+  13, 12, 11, 	//Semaforo izq
+  4, 3, 2 		//Semaforo der
+};
+
+const String STEPS[]={ //Config paso a paso
+  "100001",
+  "100010",
+  "001100",
+  "010100"
+};
+
+const int DUR_STEPS[]={ //Duracion de cada paso
+  DUR,
+  DUR/3,
+  DUR,
+  DUR/3
+};
+
+/** Variable global contador de paso **/  
+int step = 0;
+
+/** LCD **/
+#include <Adafruit_LiquidCrystal.h>
+Adafruit_LiquidCrystal lcd_1(0);
+const String BLANK_LCD = "                ";
+const int LCD_DELAY = 1000;
+
+/** DEBUG **/  
+boolean DEBUG;
+boolean BOOT_SETUP;
+const int CHECK_DUR = 50;
+const int DEBUG_PIN = 0;
+const int DEBUG_READ_PIN = 8;
+
+void setup()
+{
+  for (int pin = 0; pin < sizeof(semaforoPins) - 1; pin++) {
+    pinMode(semaforoPins[pin], OUTPUT);
+  	digitalWrite(semaforoPins[pin],LOW);  
+  };
+  //DEBUG_SETUP
+  BOOT_SETUP = true;
+  digitalWrite(DEBUG_PIN, HIGH);
+  
+  //Debug button
+  pinMode(semaforoPins[DEBUG_READ_PIN], INPUT);
+  
+  if (DEBUG){
+    digitalWrite(DEBUG_PIN,HIGH);
+  }else{
+    digitalWrite(DEBUG_PIN,LOW);
+  }
+  
+  /** Rutina de chequeo de LCD **/
+  lcd_1.begin(16, 2);
+  checkLCD();
+  
+  /** Rutina de chequeo de LEDS **/
+  ledCheck();
+  /** Rutina de chequeo de PINES SEMAFORO **/
+  pinsCheck();
+  /** Rutina de chequeo de STEPS SEMAFORO **/
+  //stepsCheck();
+
+  /** Espera hasta iniciar con normalidad **/
+  DEBUG = false;
+  BOOT_SETUP = false;
+  apagarLeds();
+  writeLCD("Boot Check","FINISHED");
+  delay(DUR);
+}
+
+void loop()
+{
+  setLeds(STEPS[step],DUR_STEPS[step]);
+  step++;
+  //Corte
+  if (step > sizeof(STEPS)-1 || step>3){
+   	step = 0; 
+  }
+  delay(DUR);
+}
+
+void setLeds(String stepStr, int dur){
+  writeLCD("STEP: " + stepStr,"Duration: "+(String) dur);
+  /*
+  if ((int) stepStr.lngeth()!=(int) sizeof(semaforoPins)){
+    apagarLeds();
+    if (inDebug()){ writeLCD("STEP: " + stepStr,"ERROR!"); }
+    //return; //ERROR!
+  }
+  */
+  for (int pos = 0; pos < (int)stepStr.length()+1 && pos < 7; pos++){
+    if((String) stepStr.charAt(pos)=="1"){
+      digitalWrite(semaforoPins[pos], HIGH);
+      if (inDebug()){ 
+        writeMsgLCD("Pos: "+ (String)pos + " PIN " + (String) semaforoPins[pos] + ": " + stepStr.charAt(pos)); 
+      }
+    }else{
+      digitalWrite(semaforoPins[pos], LOW);
+    }
+  }
+  if (!inDebug()){
+  	delay(dur);
+  }
+}
+
+void apagarLeds(){
+  for (int pin = 0; pin < sizeof(semaforoPins) - 1; pin++) {
+    digitalWrite(semaforoPins[pin],LOW);
+  }
+}
+void lcdBacklight(int status){
+  lcd_1.setBacklight(status);
+}
+
+void writeLCD(String title, String msg){
+  lcd_1.clear();
+  lcd_1.print(title);
+  lcd_1.setCursor(0, 1);
+  lcd_1.print(msg);
+  lcd_1.setCursor(0, 0);
+  delay(LCD_DELAY);
+}
+
+void writeMsgLCD(String msg){
+  lcd_1.setCursor(0, 1);
+  lcd_1.print(BLANK_LCD);
+  lcd_1.setCursor(0, 1);
+  lcd_1.print(msg);
+  lcd_1.setCursor(0, 0);
+  delay(LCD_DELAY);
+}
+/** DEBUG **/
+boolean inDebug(){
+  boolean debugReadPin=digitalRead(DEBUG_READ_PIN);
+  boolean debugPin=digitalRead(DEBUG_PIN);
+  if(digitalRead(DEBUG_READ_PIN)||(BOOT_SETUP)){
+   	DEBUG = true;
+    digitalWrite(DEBUG_PIN, HIGH);
+  }else{
+    DEBUG = false;
+    digitalWrite(DEBUG_PIN, LOW);
+  }
+  return DEBUG;
+}
+
+void checkLCD(){
+  lcd_1.setCursor(0, 0);
+  lcd_1.print("LCD UP");
+  lcd_1.setCursor(0, 1);
+  lcd_1.print("IM ALIVE BRO");
+  lcdBacklight(0);
+  delay(200); // Wait for 500 millisecond(s)
+  lcdBacklight(1);
+  delay(200); // Wait for 500 millisecond(s)
+
+  lcdBacklight(0);
+  delay(200); // Wait for 500 millisecond(s)
+  lcdBacklight(1);
+  delay(200); // Wait for 500 millisecond(s)
+
+  lcdBacklight(0);
+  delay(200); // Wait for 500 millisecond(s)
+  lcdBacklight(1);
+  delay(200); // Wait for 500 millisecond(s)
+}
+
+void ledCheck(){
+  for (int pin = 1; pin < 14; pin++) {
+     apagarLeds();
+     digitalWrite(pin,HIGH);
+     delay(CHECK_DUR);
+  }
+  apagarLeds();
+}
+
+void pinsCheck(){
+  String testTitle="Check PINS";
+  writeLCD(testTitle,"Starting");
+  /*
+  for (int pin = 1; pin < 14; pin++) {
+     digitalWrite(pin,HIGH);
+     String testMsg="Pin: " + (String) pin;
+     writeMsgLCD(testMsg);
+     delay(200);
+     digitalWrite(pin,LOW);
+  }
+  */
+  for (int pin = 0; pin < sizeof(semaforoPins) - 1 && pin < 6; pin++) {
+     apagarLeds();
+     digitalWrite(semaforoPins[pin],HIGH);
+     writeMsgLCD("Pin: " + (String)semaforoPins[pin]);
+     delay(CHECK_DUR*2);
+  }
+}
+
+void stepsCheck(){
+  for (int step = 0; step < sizeof(STEPS) - 1; step++) {
+     setLeds(STEPS[step],step);
+     delay(CHECK_DUR*2);
+  }
+}
